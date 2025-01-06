@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mines Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #1e1e2f, #3a3a52);
+            color: white;
+        }
+        h1 {
+            font-size: 2rem;
+            margin: 10px 0;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .controls input, .controls button, .controls select {
+            padding: 10px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 5px;
+        }
+        .game-container {
+            display: grid;
+            gap: 5px;
+            background: #2b2b3d;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        .cell {
+            width: 60px;
+            height: 60px;
+            background-color: #444;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        .cell:hover {
+            background-color: #666;
+        }
+        .cell.revealed {
+            background-color: red;
+            color: white;
+            font-weight: bold;
+            cursor: default;
+        }
+        .mine {
+            background-color: #e74c3c; /* Highlight mines with red */
+        }
+        .message {
+            margin-top: 20px;
+            font-size: 1.5rem;
+            color: yellow;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+        }
+        .cashout-button, .reset-button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .cashout-button {
+            background-color: green;
+        }
+        .cashout-button:hover {
+            background-color: darkgreen;
+        }
+        .reset-button {
+            background-color: red;
+        }
+        .reset-button:hover {
+            background-color: darkred;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mines Game</h1>
+    <div class="controls">
+        <label for="playerName">Enter your name:</label>
+        <input type="text" id="playerName" placeholder="Your Name">
+        <label for="difficulty">Difficulty:</label>
+        <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+        </select>
+        <button onclick="startGame()">Start Game</button>
+        <p id="score">Score: 0</p>
+    </div>
+    <div id="game" class="game-container"></div>
+    <div class="buttons">
+        <button class="cashout-button" onclick="cashOut()">Cash Out</button>
+        <button class="reset-button" onclick="resetGame()">Reset Game</button>
+    </div>
+    <div id="message" class="message"></div>
+    <div class="footer">Made by: Akshay Singh ❤️</div>
+
+    <script>
+        const gameContainer = document.getElementById('game');
+        const messageDiv = document.getElementById('message');
+        const scoreDiv = document.getElementById('score');
+        const playerNameInput = document.getElementById('playerName');
+
+        let rows, cols, minesCount, board, gameActive, score, playerName, developerMode = false;
+
+        // Initialize game board
+        function initializeBoard() {
+            board = [];
+            const totalCells = rows * cols;
+            const minePositions = Array.from({ length: totalCells }, (_, i) => i)
+                .sort(() => Math.random() - 0.5)
+                .slice(0, minesCount);
+
+            for (let i = 0; i < rows; i++) {
+                board[i] = [];
+                for (let j = 0; j < cols; j++) {
+                    board[i][j] = {
+                        isMine: minePositions.includes(i * cols + j),
+                        revealed: false,
+                    };
+                }
+            }
+        }
+
+        // Render the game board
+        function renderBoard() {
+            gameContainer.innerHTML = '';
+            gameContainer.style.gridTemplateRows = `repeat(${rows}, 60px)`;
+            gameContainer.style.gridTemplateColumns = `repeat(${cols}, 60px)`;
+
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+
+                    // If developer mode is enabled, highlight mines with special styling
+                    if (developerMode && board[i][j].isMine) {
+                        cell.classList.add('mine');
+                    }
+
+                    if (board[i][j].revealed) {
+                        cell.classList.add('revealed');
+                        cell.textContent = board[i][j].isMine ? '💣' : '';
+                    }
+
+                    cell.addEventListener('click', handleCellClick);
+                    gameContainer.appendChild(cell);
+                }
+            }
+        }
+
+        // Handle cell click
+        function handleCellClick(event) {
+            if (!gameActive) return;
+
+            const row = parseInt(event.target.dataset.row);
+            const col = parseInt(event.target.dataset.col);
+
+            if (board[row][col].revealed) return;
+
+            board[row][col].revealed = true;
+
+            if (board[row][col].isMine) {
+                showMessage(`Game Over, ${playerName}! You hit a mine.`);
+                revealAllMines();
+                gameActive = false;
+            } else {
+                score++;
+                updateScore();
+
+                if (checkWin()) {
+                    showMessage(`Congratulations, ${playerName}! You won.`);
+                    gameActive = false;
+                }
+            }
+
+            renderBoard();
+        }
+
+        // Reveal all mines (for Developer Mode)
+        function revealAllMines() {
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    if (board[i][j].isMine) {
+                        board[i][j].revealed = true;
+                    }
+                }
+            }
+        }
+
+        // Check if all non-mine cells are revealed
+        function checkWin() {
+            return board.flat().every((cell) => cell.isMine || cell.revealed);
+        }
+
+        // Show message in the UI
+        function showMessage(message) {
+            messageDiv.textContent = message;
+        }
+
+        // Update score
+        function updateScore() {
+            scoreDiv.textContent = `Score: ${score}`;
+        }
+
+        // Start the game
+        function startGame() {
+            playerName = playerNameInput.value.trim();
+
+            if (!playerName) {
+                showMessage('Please enter your name to start the game.');
+                return;
+            }
+
+            const difficulty = document.getElementById('difficulty').value;
+
+            if (difficulty === 'easy') {
+                rows = cols = 4;
+                minesCount = 3;
+            } else if (difficulty === 'medium') {
+                rows = cols = 6;
+                minesCount = 8;
+            } else if (difficulty === 'hard') {
+                rows = cols = 8;
+                minesCount = 15;
+            }
+
+            gameActive = true;
+            score = 0;
+            updateScore();
+            initializeBoard();
+            renderBoard();
+            showMessage(`Good luck, ${playerName}!`);
+        }
+
+        // Cash out functionality
+        function cashOut() {
+            if (gameActive) {
+                showMessage(`${playerName}, you cashed out with a score of ${score}!`);
+                gameActive = false;
+            }
+        }
+
+        // Reset the game
+        function resetGame() {
+            gameActive = false;
+            score = 0;
+            rows = cols = minesCount = 0;
+            playerName = '';
+            playerNameInput.value = '';
+            updateScore();
+            gameContainer.innerHTML = '';
+            showMessage('');
+        }
+
+        // Detect Ctrl + D to enable Developer Mode
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && event.key === 'd') {
+                developerMode = !developerMode;
+                showMessage(developerMode ? 'Developer Mode Enabled' : 'Developer Mode Disabled');
+                renderBoard(); // Re-render the board with highlighted mines
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
+
